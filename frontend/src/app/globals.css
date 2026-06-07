@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+:root {
+  --background: #08070d;
+  --foreground: #ded9eb;
+  --card-bg: rgba(9, 8, 15, 0.95);
+  --card-border: #2c2547;
+  --primary: #9d4edd;
+  --primary-hover: #7b2cbf;
+  --accent: #00f5d4;
+  --accent-purple: #c77dff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-accent-purple: var(--accent-purple);
+  --font-sans: var(--font-vt323), var(--font-outfit), sans-serif;
+  --font-mono: var(--font-share-tech-mono), var(--font-geist-mono), monospace;
+}
+
+body {
+  background: radial-gradient(circle at 50% 30%, #171030 0%, #08070d 90%);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  image-rendering: pixelated;
+}
+
+/* Retro Pixel Borders & Layouts */
+.retro-border {
+  border: 4px double var(--card-border);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.1);
+}
+
+.retro-border-green {
+  border: 4px double var(--accent);
+}
+
+.retro-border-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 15px rgba(157, 78, 221, 0.3);
+}
+
+.retro-panel {
+  background-color: #0b0914;
+}
+
+/* Retro Grid Background for AI Host Frame */
+.retro-grid {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(157, 78, 221, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(157, 78, 221, 0.05) 1px, transparent 1px);
+}
+
+/* Blinking Cursor Animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.blink-cursor::after {
+  content: "█";
+  margin-left: 4px;
+  animation: blink 1s steps(2, start) infinite;
+  color: var(--accent);
+}
+
+/* Retro Vibrating Animation for Active Host */
+@keyframes retro-wiggle {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-1px, -1px); }
+  20% { transform: translate(1px, 0px); }
+  30% { transform: translate(-1px, 1px); }
+  40% { transform: translate(1px, -1px); }
+  50% { transform: translate(-1px, 0px); }
+  60% { transform: translate(1px, 1px); }
+  70% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 0px); }
+  90% { transform: translate(-1px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+.animate-vibrate {
+  animation: retro-wiggle 0.3s linear infinite;
+}
+
+/* Soundwaves Behind Cat Frames */
+@keyframes wave-scale {
+  0%, 100% {
+    transform: scaleY(0.15);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.retro-wave-bar {
+  width: 4px;
+  height: 60px;
+  background-color: rgba(157, 78, 221, 0.4);
+  transform-origin: center;
+  animation: wave-scale 1.2s ease-in-out infinite;
+}
+
+.retro-wave-bar:nth-child(even) {
+  background-color: rgba(0, 245, 212, 0.4);
+  animation-duration: 0.8s;
+}
+
+.retro-wave-bar:nth-child(3n) {
+  animation-delay: 0.2s;
+  animation-duration: 1.4s;
+}
+
+.retro-wave-bar:nth-child(4n) {
+  animation-delay: 0.4s;
+  animation-duration: 1s;
+}
+
+/* Custom retro scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #09080f;
+  border-left: 2px solid var(--card-border);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border: 2px solid #09080f;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* CRT Screen Effect overlay */
+.crt::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 999;
+  background-size: 100% 3px, 3px 100%;
+  pointer-events: none;
+}
+
+/* Flashing Record light for Speech Recognition */
+@keyframes record-flash {
+  0%, 100% {
+    background-color: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.4);
+    color: #f87171;
+  }
+  50% {
+    background-color: rgba(220, 38, 38, 0.4);
+    border-color: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  }
+}
+.animate-record {
+  animation: record-flash 1s steps(2, start) infinite;
+}
+
