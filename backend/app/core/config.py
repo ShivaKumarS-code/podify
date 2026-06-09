@@ -21,7 +21,11 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = Field(default="")
     
     # CORS Origins (Allowed Frontend URL)
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://podify-sigma.vercel.app"
+    ]
     
     # Text to Speech configuration (Optional API Keys)
     ELEVENLABS_API_KEY: str = Field(default="")
