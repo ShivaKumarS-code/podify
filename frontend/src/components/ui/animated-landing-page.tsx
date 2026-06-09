@@ -333,9 +333,21 @@ export function PodifyHeroAnimated() {
 
                 <button 
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-                  className="md:hidden rounded-md border border-white/20 bg-white/5 px-4 py-2 text-sm uppercase tracking-wider transition-colors hover:bg-white/10 ml-4 md:ml-0"
+                  className="md:hidden rounded-full border border-white/20 bg-white/5 p-2.5 transition-colors hover:bg-white/10 ml-4 cursor-pointer flex items-center justify-center"
+                  aria-label="Toggle menu"
                 >
-                  {isMobileMenuOpen ? "Close" : "Menu"}
+                  {isMobileMenuOpen ? (
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="4" y1="12" x2="20" y2="12" />
+                      <line x1="4" y1="6" x2="20" y2="6" />
+                      <line x1="4" y1="18" x2="20" y2="18" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
