@@ -39,19 +39,20 @@ The podcast script and flow are driven by a multi-agent state graph:
 * Dialogue turns are synthesised on-the-fly into mp3 files using `edge-tts`.
 * Generated audio assets are served dynamically to the Next.js frontend, allowing natural pacing and playback in the Podcast Room.
 
-### 4. Secure Authentication (Neon Auth + Better Auth)
-* User authentication is managed using **Neon Auth** in a dedicated database schema (`neon_auth`), separating security concerns from application schemas.
-* The frontend coordinates session caching via **Better Auth**.
-* All database models (`documents`, `podcast_sessions`) are user-partitioned via `VARCHAR(255)` string identifiers, securing private assets from cross-user access.
+### 4. Secure Authentication (Custom JWT Authentication)
+* User authentication is handled directly by the backend using cryptographically signed **JSON Web Tokens (JWT)**.
+* Passwords are hashed during registration and validated during login using `bcrypt` salting.
+* Session tokens are stored in `localStorage` and client cookies (`auth_token`), allowing edge-compatible Next.js routing middleware validation.
+* All backend database models (`documents`, `podcast_sessions`) are user-partitioned via the verified user ID claims extracted from the JWT signature, preventing unauthorized cross-user access.
 
 ---
 
 ## 🚀 Setup & Execution Guide
 
 ### 1. Database Setup
-1. Create a serverless PostgreSQL database on [Neon](https://neon.tech/).
-2. Navigate to the **Auth** configuration in the Neon Console and enable Neon Auth.
-3. Retrieve your database connection string (URI format starting with `postgresql://`).
+1. Create a serverless PostgreSQL database on [Neon](https://neon.tech/) (or any standard PostgreSQL instance).
+2. Retrieve your database connection string (URI format starting with `postgresql://`).
+*(Note: Neon Auth activation is NOT required, as authentication is fully self-hosted by the application using JWT).*
 
 ---
 
@@ -61,11 +62,12 @@ Open a terminal in the `/backend` directory:
 1. **Configure Environment Variables**:
    Create a `.env` file inside `/backend` (using `.env.example` as a template):
    ```env
-   DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@YOUR_POOLER_HOST/neondb?sslmode=require"
-   GEMINI_API_KEY="your-google-gemini-api-key"
-   GROQ_API_KEY="your-groq-api-key"
-   CEREBRAS_API_KEY="your-cerebras-api-key"
-   ```
+    DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@YOUR_POOLER_HOST/neondb?sslmode=require"
+    GEMINI_API_KEY="your-google-gemini-api-key"
+    GROQ_API_KEY="your-groq-api-key"
+    CEREBRAS_API_KEY="your-cerebras-api-key"
+    JWT_SECRET="optional-custom-jwt-secret-key"
+    ```
 
 2. **Activate the Virtual Environment**:
    * **Windows (PowerShell)**:
@@ -93,15 +95,12 @@ Open a terminal in the `/backend` directory:
 ### 3. Frontend Setup & Run
 Open a terminal in the `/frontend` directory:
 
-1. **Configure Auth Keys**:
-   Create a `.env.local` file inside `/frontend`:
+1. **Configure Environment Variables**:
+   Create a `.env.local` file inside `/frontend` if you wish to override the default local backend URL:
    ```env
-   # Found in Neon Console -> Auth -> Configuration
-   NEON_AUTH_BASE_URL="https://your-auth-endpoint.neonauth.c-7.us-east-1.aws.neon.tech/neondb/auth"
-   
-   # 32-character encryption key for cookie session caching
-   NEON_AUTH_COOKIE_SECRET="your-secure-32-character-secret-key="
+   NEXT_PUBLIC_API_URL="http://localhost:8000/api"
    ```
+   *(By default, the frontend points to `http://localhost:8000/api` if no variable is provided).*
 
 2. **Run Dev Server**:
    ```bash
