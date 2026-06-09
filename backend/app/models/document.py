@@ -11,7 +11,7 @@ class Document(SQLModel, table=True):
     title: str
     file_path: str
     page_count: int
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    user_id: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class DocumentChunk(SQLModel, table=True):

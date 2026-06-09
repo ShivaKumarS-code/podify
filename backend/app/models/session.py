@@ -10,7 +10,7 @@ class PodcastSession(SQLModel, table=True):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     document_id: int = Field(foreign_key="documents.id", ondelete="CASCADE")
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    user_id: Optional[str] = Field(default=None, index=True)
     skill_level: str = Field(default="beginner") # beginner, expert
     agenda_index: int = Field(default=0) # Index in the discussion agenda
     

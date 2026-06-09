@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
 from sqlmodel import Session, select
 import os
 import shutil
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.database import get_session
 from app.models.document import Document
 from app.services.pdf_processor import PDFProcessor
 from app.services.vector_store import VectorStore
 from app.agents.planner import PodcastPlanner
+from app.core.auth import get_user_id_by_email
 
 router = APIRouter()
 
@@ -18,7 +19,9 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
 ) -> Dict[str, Any]:
     """
     Uploads a PDF, processes it (extracts text, chunks it, embeds it),
@@ -26,6 +29,16 @@ async def upload_document(
     """
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not found in system.")
         
     # 1. Save file locally
     file_path = os.path.join(UPLOAD_DIR, file.filename)
@@ -43,11 +56,12 @@ async def upload_document(
         if page_count == 0:
             raise HTTPException(status_code=400, detail="PDF has no extractable text.")
             
-        # 3. Create Document record in DB
+        # 3. Create Document record in DB linked to user
         db_document = Document(
             title=file.filename.replace(".pdf", "").replace("_", " ").replace("-", " "),
             file_path=file_path,
-            page_count=page_count
+            page_count=page_count,
+            user_id=user_id
         )
         db.add(db_document)
         db.commit()
@@ -76,11 +90,24 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"PDF Processing failed: {str(e)}")
 
 @router.get("/")
-def list_documents(db: Session = Depends(get_session)) -> List[Dict[str, Any]]:
+def list_documents(
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
+) -> List[Dict[str, Any]]:
     """
-    List all processed documents in the platform.
+    List all processed documents in the platform for the authenticated user.
     """
-    statement = select(Document).order_by(Document.created_at.desc())
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    if not user_id:
+        return []
+
+    statement = select(Document).where(Document.user_id == user_id).order_by(Document.created_at.desc())
     documents = db.exec(statement).all()
     
     return [
@@ -92,3 +119,80 @@ def list_documents(db: Session = Depends(get_session)) -> List[Dict[str, Any]]:
         }
         for doc in documents
     ]
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
+) -> Dict[str, Any]:
+    """
+    Deletes a processed document from the platform.
+    This also deletes local PDF file and associated database records (Document, DocumentChunk, Sessions, Turns).
+    """
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not found in system.")
+
+    doc = db.get(Document, document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if doc.user_id != user_id:
+        raise HTTPException(status_code=403, detail="You do not own this document.")
+        
+    # 1. Delete associated sessions and their physical audio files
+    from app.models.session import PodcastSession, PodcastTurn
+    
+    sessions_statement = select(PodcastSession).where(PodcastSession.document_id == document_id)
+    sessions = db.exec(sessions_statement).all()
+    
+    # Static audio path directory
+    static_audio_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+        "static", 
+        "audio"
+    )
+    
+    for session_obj in sessions:
+        # Find turns for this session
+        turns_statement = select(PodcastTurn).where(PodcastTurn.session_id == session_obj.id)
+        turns = db.exec(turns_statement).all()
+        for t in turns:
+            if t.audio_path:
+                filename = os.path.basename(t.audio_path)
+                physical_audio_path = os.path.join(static_audio_dir, filename)
+                if os.path.exists(physical_audio_path):
+                    try:
+                        os.remove(physical_audio_path)
+                    except Exception as e:
+                        print(f"WARNING: Failed to delete audio file {physical_audio_path}: {e}")
+            db.delete(t)
+        db.delete(session_obj)
+
+    # 2. Delete the physical document file
+    if doc.file_path and os.path.exists(doc.file_path):
+        try:
+            os.remove(doc.file_path)
+        except Exception as e:
+            print(f"WARNING: Failed to delete physical document file {doc.file_path}: {e}")
+            
+    # 3. Delete DocumentChunk records
+    from app.models.document import DocumentChunk
+    chunks_statement = select(DocumentChunk).where(DocumentChunk.document_id == document_id)
+    chunks = db.exec(chunks_statement).all()
+    for chunk in chunks:
+        db.delete(chunk)
+        
+    # 4. Delete the Document itself
+    db.delete(doc)
+    db.commit()
+    
+    return {"success": True, "message": f"Document '{doc.title}' deleted successfully."}
+

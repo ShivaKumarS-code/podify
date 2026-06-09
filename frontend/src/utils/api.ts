@@ -1,3 +1,5 @@
+import { authClient } from "@/lib/auth/client";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export interface DocumentData {
@@ -37,9 +39,33 @@ export interface PodcastTurnData {
   created_at: string;
 }
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const session = await authClient.getSession();
+    console.log("getAuthHeaders session data:", session);
+    const email = session?.data?.user?.email;
+    const id = session?.data?.user?.id;
+    const headers: Record<string, string> = {};
+    if (email) {
+      headers["X-User-Email"] = email;
+    }
+    if (id) {
+      headers["X-User-Id"] = id;
+    }
+    console.log("getAuthHeaders headers:", headers);
+    return headers;
+  } catch (err) {
+    console.error("Error retrieving session auth headers:", err);
+    return {};
+  }
+}
+
 export const api = {
   async listDocuments(): Promise<DocumentData[]> {
-    const res = await fetch(`${API_BASE_URL}/documents/`);
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/documents/`, {
+      headers: authHeaders,
+    });
     if (!res.ok) throw new Error("Failed to list documents");
     return res.json();
   },
@@ -48,8 +74,10 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
 
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/documents/upload`, {
       method: "POST",
+      headers: authHeaders,
       body: formData,
     });
     if (!res.ok) {
@@ -60,9 +88,13 @@ export const api = {
   },
 
   async createSession(documentId: number, skillLevel: string): Promise<SessionData & { first_turn?: PodcastTurnData }> {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/sessions/create`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
       body: JSON.stringify({ document_id: documentId, skill_level: skillLevel }),
     });
     if (!res.ok) throw new Error("Failed to create session");
@@ -70,13 +102,19 @@ export const api = {
   },
 
   async getSession(sessionId: string): Promise<SessionData> {
-    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}`);
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
+      headers: authHeaders,
+    });
     if (!res.ok) throw new Error("Failed to load session details");
     return res.json();
   },
 
   async getSessionTurns(sessionId: string): Promise<PodcastTurnData[]> {
-    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/turns`);
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/turns`, {
+      headers: authHeaders,
+    });
     if (!res.ok) throw new Error("Failed to load session transcript");
     return res.json();
   },
@@ -85,12 +123,29 @@ export const api = {
     sessionId: string,
     userMessage?: string
   ): Promise<{ session_completed: boolean; turn?: PodcastTurnData }> {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/next-turn`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
       body: JSON.stringify({ user_message: userMessage || null }),
     });
     if (!res.ok) throw new Error("Failed to generate next turn");
+    return res.json();
+  },
+
+  async deleteDocument(documentId: number): Promise<{ success: boolean; message: string }> {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to delete document" }));
+      throw new Error(err.detail || "Failed to delete document");
+    }
     return res.json();
   },
 };

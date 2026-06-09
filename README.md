@@ -1,45 +1,74 @@
-# Podify - Interactive Document Podcasts
+# 🎙️ PODIFY.EXE — Interactive Document Podcasts
 
-Podify is a multi-agent document intelligence platform that transforms PDFs into real-time, conversational podcasts. Instead of reading long pages, you listen to a discussion between two AI hosts (Alexis and Devon) and can interject at any time with text questions.
+Podify.exe is a serverless, multi-agent document intelligence platform that transforms static PDFs into dynamic, conversational audio podcasts. Instead of reading long papers or textbooks, users listen to a structured discussion between two AI hosts (Alexis and Devon) and can interject at any time with text or questions, pausing the show to guide the conversation.
 
----
-
-## 🏗️ Text-Only MVP Architecture
-
-This is the **Text-Only MVP** of Podify, implementing the core features before introducing streaming audio and voice activity detection:
-
-1. **Document Ingestion**: PDFs are processed page-by-page, chunked, and embedded using Google's `text-embedding-004` model.
-2. **NeonDB with pgvector**: Chunk embeddings and metadata are stored in a relational PostgreSQL schema on Neon, enabling high-performance semantic search using pgvector's cosine distance.
-3. **Podcast Planner**: An upfront planner agent analyzes the document context and generates a structured 6-segment JSON discussion outline.
-4. **LangGraph Multi-Agent Engine**:
-   - **Moderator (Hidden)**: A background node that manages topic progression, updates database state, and switches turns.
-   - **Alexis (Expert Host - Visible)**: Explains advanced terms, debates concepts, and grounds discussions in PDF context.
-   - **Devon (Curious Co-Host - Visible)**: Questions Alexis. Devon's curiosity adapts to the listener's profile (e.g. asking for analogies for beginners or deep comparisons for experts).
-5. **Interactive Controls**: Auto-Play generates turns sequentially with a natural conversational rhythm. The user can type a question, immediately pausing the auto-play to inject their input, which Alexis answers in the next turn.
+The application is styled with a premium, retro-futuristic hacker terminal interface, complete with micro-animations, glassmorphism, looping video backdrops, and interactive dashboard analytics.
 
 ---
 
-## 🚀 Setup & Running Guide
+## 🏗️ Architecture & Core Components
 
-### 1. Database Setup (NeonDB)
-1. Go to [Neon Console](https://neon.tech/) and create a serverless PostgreSQL database.
-2. Copy the Connection String (URI format, starting with `postgresql://`).
-3. Make sure to choose a string that has `?sslmode=require` (or append it).
+```mermaid
+graph TD
+    A[User Uploads PDF] --> B[FastAPI Ingestion]
+    B --> C[PDF Text Processor]
+    C --> D[Gemini 1.5 Text Embeddings]
+    D --> E[Neon PostgreSQL + pgvector]
+    B --> F[Podcast Planner Agent]
+    F --> G[LangGraph Moderator Node]
+    G --> H[Host Alexis: Expert]
+    G --> I[Co-Host Devon: Adaptive]
+    H & I --> J[edge-tts Voice Synthesis]
+    J --> K[Next.js Client Player]
+```
+
+### 1. Ingestion & Vector DB (Neon PostgreSQL + `pgvector`)
+* **Text Extraction**: PDFs are parsed page-by-page and chunked dynamically.
+* **Vector Store**: Semantic embeddings are calculated via Google's `text-embedding-004` model.
+* **pgvector Search**: Embeddings are stored in Neon PostgreSQL. During user interjections, the system retrieves relevant document chunks using cosine distance.
+
+### 2. Multi-Agent LangGraph Engine
+The podcast script and flow are driven by a multi-agent state graph:
+* **The Moderator (Hidden)**: Manages topic progression, controls transitions, and logs session history.
+* **Alexis (Visible - Expert Host)**: Explains complex concepts, references specific sections of the PDF, and answers user interjections.
+* **Devon (Visible - Curious Co-Host)**: Asks questions to keep the dialogue engaging. Devon adjusts his query style based on the user's selected **Listener Skill Profile**:
+  * *Beginner Mode*: Requests intuitive analogies and simplified terms.
+  * *Expert Mode*: Challenges Alexis with theoretical comparisons and deep dives.
+
+### 3. Audio TTS Generation
+* Dialogue turns are synthesised on-the-fly into mp3 files using `edge-tts`.
+* Generated audio assets are served dynamically to the Next.js frontend, allowing natural pacing and playback in the Podcast Room.
+
+### 4. Secure Authentication (Neon Auth + Better Auth)
+* User authentication is managed using **Neon Auth** in a dedicated database schema (`neon_auth`), separating security concerns from application schemas.
+* The frontend coordinates session caching via **Better Auth**.
+* All database models (`documents`, `podcast_sessions`) are user-partitioned via `VARCHAR(255)` string identifiers, securing private assets from cross-user access.
+
+---
+
+## 🚀 Setup & Execution Guide
+
+### 1. Database Setup
+1. Create a serverless PostgreSQL database on [Neon](https://neon.tech/).
+2. Navigate to the **Auth** configuration in the Neon Console and enable Neon Auth.
+3. Retrieve your database connection string (URI format starting with `postgresql://`).
 
 ---
 
 ### 2. Backend Setup & Run
 Open a terminal in the `/backend` directory:
 
-1. **Create Configuration**:
-   Create a `.env` file inside `/backend` (you can copy `.env.example` as a template) and add your credentials:
+1. **Configure Environment Variables**:
+   Create a `.env` file inside `/backend` (using `.env.example` as a template):
    ```env
-   DATABASE_URL="postgresql://user:password@ep-xxxxxx.us-east-2.aws.neon.tech/neondb?sslmode=require"
-   GEMINI_API_KEY="your-gemini-api-key"
+   DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@YOUR_POOLER_HOST/neondb?sslmode=require"
+   GEMINI_API_KEY="your-google-gemini-api-key"
+   GROQ_API_KEY="your-groq-api-key"
+   CEREBRAS_API_KEY="your-cerebras-api-key"
    ```
 
-2. **Activate Virtual Environment**:
-   * **Windows**:
+2. **Activate the Virtual Environment**:
+   * **Windows (PowerShell)**:
      ```powershell
      venv\Scripts\Activate.ps1
      ```
@@ -48,33 +77,37 @@ Open a terminal in the `/backend` directory:
      source venv/bin/activate
      ```
 
-3. **Install Dependencies** (if not already done):
+3. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Start the FastAPI Server**:
+4. **Start the API Server**:
    ```bash
    uvicorn app.main:app --reload --port 8000
    ```
-   *Note: On startup, FastAPI will automatically connect to NeonDB, enable the `pgvector` extension, and create all necessary tables (users, documents, chunks, sessions, and turns).*
+   *Note: On startup, the server automatically initializes database tables (`documents`, `document_chunks`, `podcast_sessions`, `podcast_turns`) in the public schema and verifies connectivity.*
 
 ---
 
 ### 3. Frontend Setup & Run
-Open another terminal in the `/frontend` directory:
+Open a terminal in the `/frontend` directory:
 
-1. **Start the Next.js Dev Server**:
+1. **Configure Auth Keys**:
+   Create a `.env.local` file inside `/frontend`:
+   ```env
+   # Found in Neon Console -> Auth -> Configuration
+   NEON_AUTH_BASE_URL="https://your-auth-endpoint.neonauth.c-7.us-east-1.aws.neon.tech/neondb/auth"
+   
+   # 32-character encryption key for cookie session caching
+   NEON_AUTH_COOKIE_SECRET="your-secure-32-character-secret-key="
+   ```
+
+2. **Run Dev Server**:
    ```bash
    npm run dev
    ```
-2. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+3. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
-
-## 🎯 Exploring the App Features
-1. **Set Skill Level**: Select **Beginner** or **Advanced** profile from the dashboard.
-2. **Upload PDF**: Drag & drop your PDF file. The system will extract text, calculate embeddings, save chunks to Neon, and plan the agenda. You will be redirected to the **Podcast Room**.
-3. **Listen (Read)**: Turn **Auto-Play ON**. You'll see Alexis and Devon talking back-and-forth about the document, topic-by-topic.
-4. **Interject**: Type a question in the input box and click **Interject**. The Auto-Play will pause, your comment will be logged, and Alexis will immediately answer your question grounded in the PDF text.
-5. **Resume**: You can turn **Auto-Play ON** again to continue the regular podcast flow!

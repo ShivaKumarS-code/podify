@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ from app.models.document import Document
 from app.models.session import PodcastSession, PodcastTurn
 from app.agents.podcast_graph import PodcastGraphService
 from app.agents.planner import PodcastPlanner
+from app.core.auth import get_user_id_by_email
 
 router = APIRouter()
 
@@ -21,15 +22,28 @@ class NextTurnRequest(BaseModel):
 @router.post("/create")
 def create_session(
     data: SessionCreate,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
 ) -> Dict[str, Any]:
     """
-    Creates a new podcast session. If no agenda is provided,
-    it runs the Planner Agent to generate one.
+    Creates a new podcast session if the document belongs to the user.
     """
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not found in system.")
+
     document = db.get(Document, data.document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    if document.user_id != user_id:
+        raise HTTPException(status_code=403, detail="You do not own this document.")
         
     agenda = data.agenda
     if not agenda:
@@ -41,6 +55,7 @@ def create_session(
     # Create the session
     new_session = PodcastSession(
         document_id=data.document_id,
+        user_id=user_id,
         skill_level=data.skill_level,
         agenda=agenda
     )
@@ -74,17 +89,31 @@ def create_session(
 @router.get("/{session_id}")
 def get_session_details(
     session_id: str,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
 ) -> Dict[str, Any]:
     """
-    Retrieves the status and metadata of a podcast session.
+    Retrieves the status and metadata of a podcast session if owned by the user.
     """
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not found in system.")
+
     session_obj = db.get(PodcastSession, session_id)
     if not session_obj:
         raise HTTPException(status_code=404, detail="Session not found")
         
     document = db.get(Document, session_obj.document_id)
-    title = document.title if document else "Unknown Document"
+    if not document or document.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this session.")
+        
+    title = document.title
     
     return {
         "session_id": session_obj.id,
@@ -100,11 +129,30 @@ def get_session_details(
 @router.get("/{session_id}/turns")
 def get_session_turns(
     session_id: str,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
 ) -> List[Dict[str, Any]]:
     """
-    Returns the full history of dialogue turns for a session.
+    Returns the full history of dialogue turns for a session if owned by the user.
     """
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not found in system.")
+
+    session_obj = db.get(PodcastSession, session_id)
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    document = db.get(Document, session_obj.document_id)
+    if not document or document.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this session.")
+
     statement = (
         select(PodcastTurn)
         .where(PodcastTurn.session_id == session_id)
@@ -128,12 +176,30 @@ def get_session_turns(
 def generate_next_turn(
     session_id: str,
     body: Optional[NextTurnRequest] = None,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    x_user_id: Optional[str] = Header(default=None),
+    x_user_email: Optional[str] = Header(default=None)
 ) -> Dict[str, Any]:
     """
-    Triggers the generation of the next turn in the conversation.
-    If the user has provided input (text), it's processed as an interruption.
+    Triggers the generation of the next turn in the conversation if owned by the user.
     """
+    if not x_user_id and not x_user_email:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = x_user_id
+    if not user_id:
+        user_id = get_user_id_by_email(db, x_user_email)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not found in system.")
+
+    session_obj = db.get(PodcastSession, session_id)
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    document = db.get(Document, session_obj.document_id)
+    if not document or document.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this session.")
+
     user_msg = body.user_message if body else None
     
     try:
@@ -145,10 +211,9 @@ def generate_next_turn(
         
     if not new_turn:
         # Means session is completed or inactive
-        session_obj = db.get(PodcastSession, session_id)
         return {
             "session_completed": True,
-            "is_active": session_obj.is_active if session_obj else False
+            "is_active": session_obj.is_active
         }
         
     return {
