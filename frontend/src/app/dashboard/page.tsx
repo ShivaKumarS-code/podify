@@ -9,7 +9,7 @@ import Link from "next/link";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  const { data: session, loading: sessionLoading } = authClient.useSession();
   const user = session?.user;
   const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [skillLevel, setSkillLevel] = useState<"beginner" | "expert">("beginner");
@@ -19,8 +19,16 @@ export default function Dashboard() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch documents list on mount
+  // Redirect to sign-in if not authenticated
   useEffect(() => {
+    if (!sessionLoading && !user) {
+      router.push("/auth/sign-in");
+    }
+  }, [sessionLoading, user, router]);
+
+  // Fetch documents list on mount/auth state change
+  useEffect(() => {
+    if (!user) return;
     async function loadDocs() {
       try {
         const docs = await api.listDocuments();
@@ -30,7 +38,7 @@ export default function Dashboard() {
       }
     }
     loadDocs();
-  }, []);
+  }, [user]);
 
   // Handle file drop
   const handleDrag = (e: React.DragEvent) => {

@@ -222,17 +222,6 @@ function SignUpForm({ onError }: { onError: (msg: string) => void }) {
 function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle: () => void; }) {
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleGoogleSignIn = async () => {
-    try {
-      await authClient.signIn.social({
-        provider: "google",
-        callbackURL: "/dashboard",
-      });
-    } catch (err: any) {
-      setErrorMsg(err.message || "Google Authentication failed.");
-    }
-  };
-
   return (
     <div className="mx-auto grid w-[400px] max-w-full gap-5 px-4">
       {errorMsg && (
@@ -253,13 +242,6 @@ function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle
           {isSignIn ? "Sign up" : "Sign in"}
         </Button>
       </div>
-      <div className="relative text-center text-xs font-mono uppercase text-neutral-500 after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-white/10">
-        <span className="relative z-10 bg-black px-3 text-neutral-500 tracking-wider">Or continue with</span>
-      </div>
-      <Button variant="outline" type="button" onClick={handleGoogleSignIn} className="font-mono uppercase text-base h-12">
-        <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google icon" className="mr-2 h-4 w-4" />
-        Continue with Google
-      </Button>
     </div>
   );
 }

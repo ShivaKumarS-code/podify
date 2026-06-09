@@ -17,4 +17,5 @@ groq>=1.4.0
 edge-tts>=6.1.9
 cerebras-cloud-sdk>=1.0.0
 python-multipart
-
+pyjwt>=2.8.0
+bcrypt>=4.1.0

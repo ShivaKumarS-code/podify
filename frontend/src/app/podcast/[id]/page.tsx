@@ -24,6 +24,7 @@ export default function PodcastRoom() {
   const [catState, setCatState] = useState<"expert-speaking" | "cohost-speaking" | "user-speaking" | "thinking" | "idle">("idle");
   const [isInterruptionResponse, setIsInterruptionResponse] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"stage" | "transcript">("stage");
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -374,9 +375,9 @@ export default function PodcastRoom() {
 
   if (!session) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-black font-mono">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="text-white animate-pulse text-2xl font-bold blink-cursor">
+      <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-black font-mono p-4">
+        <div className="flex flex-col items-center space-y-4 max-w-full text-center">
+          <div className="text-white animate-pulse text-lg sm:text-2xl font-bold blink-cursor break-words">
             CONNECTING TO PODIFY.EXE...
           </div>
         </div>
@@ -388,7 +389,7 @@ export default function PodcastRoom() {
   const fileSize = "12.4 MB";
 
   return (
-    <div className="w-full h-screen max-h-screen bg-black flex flex-col text-slate-300 font-mono text-xs crt relative overflow-hidden p-4">
+    <div className="w-full h-[100dvh] bg-black flex flex-col text-slate-300 font-mono text-xs crt relative overflow-hidden p-4">
       
       {/* Hidden HTML5 Audio Element */}
       <audio ref={audioRef} onEnded={handleAudioEnded} className="hidden" />
@@ -435,11 +436,35 @@ export default function PodcastRoom() {
         </div>
       </header>
 
+      {/* Mobile view selector tabs */}
+      <div className="flex md:hidden border-2 border-white mb-3 bg-neutral-955 font-mono text-xs select-none">
+        <button
+          onClick={() => setMobileTab("stage")}
+          className={`flex-1 py-3 text-center font-bold tracking-widest transition-all cursor-pointer ${
+            mobileTab === "stage"
+              ? "bg-white text-black font-extrabold"
+              : "bg-transparent text-slate-400 hover:text-white"
+          }`}
+        >
+          [ 📺 STAGE FEED ]
+        </button>
+        <button
+          onClick={() => setMobileTab("transcript")}
+          className={`flex-1 py-3 text-center font-bold tracking-widest transition-all cursor-pointer ${
+            mobileTab === "transcript"
+              ? "bg-white text-black font-extrabold"
+              : "bg-transparent text-slate-400 hover:text-white"
+          }`}
+        >
+          [ 📜 LIVE TRANSCRIPT ]
+        </button>
+      </div>
+
       {/* ================= MAIN CONTENT GRID ================= */}
       <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-4 gap-4 overflow-hidden">
         
         {/* ================= LEFT COLUMN ================= */}
-        <aside className="md:col-span-1 flex flex-col gap-4 overflow-hidden h-full">
+        <aside className="hidden md:flex md:col-span-1 flex-col gap-4 overflow-hidden h-full">
           {/* Document Panel */}
           <section className="border-4 border-double border-white bg-black p-4 flex flex-col gap-3">
             <h2 className="text-xs font-extrabold text-white uppercase border-b border-neutral-800 pb-1.5 tracking-wider">
@@ -500,32 +525,12 @@ export default function PodcastRoom() {
               })}
             </div>
           </section>
-
-          {/* Settings Panel */}
-          <section className="border-4 border-double border-white bg-black p-4 flex flex-col gap-3">
-            <div>
-              <label className="block text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider mb-1">
-                LISTENING MODE
-              </label>
-              <div className="w-full px-2 py-1.5 border border-neutral-700 bg-neutral-900 text-neutral-300 text-[11px] rounded capitalize flex justify-between items-center cursor-not-allowed">
-                <span>{session.skill_level}</span>
-                <span className="text-[8px] text-slate-500">▼</span>
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider mb-1">
-                PODCAST LENGTH
-              </label>
-              <div className="w-full px-2 py-1.5 border border-neutral-700 bg-neutral-900 text-neutral-300 text-[11px] rounded flex justify-between items-center cursor-not-allowed">
-                <span>Medium (20 min)</span>
-                <span className="text-[8px] text-slate-500">▼</span>
-              </div>
-            </div>
-          </section>
         </aside>
 
         {/* ================= CENTER COLUMN (STAGE & CONTROL) ================= */}
-        <main className="md:col-span-2 flex flex-col gap-4 overflow-hidden h-full">
+        <main className={`col-span-1 md:col-span-2 flex flex-col gap-4 overflow-hidden h-full ${
+          mobileTab === "stage" ? "flex" : "hidden md:flex"
+        }`}>
           
           {/* Main Visual Arena */}
           <section className="border-4 border-double border-white bg-black flex-1 min-h-[300px] flex flex-col relative overflow-hidden select-none">
@@ -739,8 +744,10 @@ export default function PodcastRoom() {
           </section>
         </main>
 
-        {/* ================= RIGHT COLUMN (TRANSCRIPT & KEYBOARD) ================= */}
-        <aside className="md:col-span-1 flex flex-col gap-4 overflow-hidden h-full">
+        {/* ================= RIGHT COLUMN (TRANSCRIPT) ================= */}
+        <aside className={`col-span-1 md:col-span-1 flex flex-col gap-4 overflow-hidden h-full ${
+          mobileTab === "transcript" ? "flex" : "hidden md:flex"
+        }`}>
           {/* Live Transcript Log Panel */}
           <section className="border-4 border-double border-white bg-black p-4 flex-1 flex flex-col min-h-[250px]">
             <h2 className="text-xs font-extrabold text-white uppercase border-b border-neutral-800 pb-1.5 tracking-wider mb-2.5">
@@ -785,27 +792,6 @@ export default function PodcastRoom() {
             >
               SHOW FULL TRANSCRIPT
             </button>
-          </section>
-
-          {/* Shortcuts Controls Panel */}
-          <section className="border-4 border-double border-white bg-black p-4 flex flex-col gap-2">
-            <h2 className="text-xs font-extrabold text-white uppercase border-b border-neutral-800 pb-1.5 tracking-wider mb-1.5">
-              [ KEYBOARD CONTROLS ]
-            </h2>
-            <div className="space-y-2 select-none">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">✦ Interrupt</span>
-                <span className="px-1.5 py-0.5 border border-neutral-600 bg-neutral-800 text-neutral-300 rounded font-extrabold text-[9px]">SPACE</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">✦ Skip / Advance</span>
-                <span className="px-1.5 py-0.5 border border-neutral-600 bg-neutral-800 text-neutral-300 rounded font-extrabold text-[9px] w-6 text-center">S</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">✦ New Question</span>
-                <span className="px-1.5 py-0.5 border border-neutral-600 bg-neutral-800 text-neutral-300 rounded font-extrabold text-[9px] w-6 text-center">N</span>
-              </div>
-            </div>
           </section>
         </aside>
       </div>

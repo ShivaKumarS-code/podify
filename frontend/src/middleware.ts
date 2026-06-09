@@ -1,14 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 
 export default function middleware(request: NextRequest) {
-  const allCookies = request.cookies.getAll();
-  
-  // Check if any cookie matches the session token pattern
-  const hasSessionCookie = allCookies.some(cookie => 
-    cookie.name.includes('session_token') || 
-    cookie.name.startsWith('better-auth') || 
-    cookie.name.startsWith('neon-auth')
-  );
+  // Check if the auth_token cookie exists
+  const hasSessionCookie = request.cookies.has('auth_token');
 
   const { pathname } = request.nextUrl;
 

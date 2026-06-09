@@ -20,7 +20,13 @@ class Settings(BaseSettings):
     # Groq API Key
     GROQ_API_KEY: str = Field(default="")
     
+    # JWT Configuration
+    JWT_SECRET: str = Field(default="super-secret-jwt-key-change-in-env")
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=1440) # 24 hours
+    
     # CORS Origins (Allowed Frontend URL)
+
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",

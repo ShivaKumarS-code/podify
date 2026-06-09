@@ -24,6 +24,7 @@ def init_db():
     with Session(engine) as session:
         # Enable pgvector extension
         session.exec(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        session.exec(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);"))
         session.commit()
     
     # Create all tables

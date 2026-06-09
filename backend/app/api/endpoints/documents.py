@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlmodel import Session, select
 import os
 import shutil
 from typing import List, Dict, Any, Optional
 from app.core.database import get_session
 from app.models.document import Document
+from app.models.user import User
 from app.services.pdf_processor import PDFProcessor
 from app.services.vector_store import VectorStore
 from app.agents.planner import PodcastPlanner
-from app.core.auth import get_user_id_by_email
+from app.core.auth import get_current_user
 
 router = APIRouter()
 
@@ -20,8 +21,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Uploads a PDF, processes it (extracts text, chunks it, embeds it),
@@ -30,15 +30,7 @@ async def upload_document(
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not found in system.")
+    user_id = str(current_user.id)
         
     # 1. Save file locally
     file_path = os.path.join(UPLOAD_DIR, file.filename)
@@ -92,20 +84,12 @@ async def upload_document(
 @router.get("/")
 def list_documents(
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """
     List all processed documents in the platform for the authenticated user.
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    if not user_id:
-        return []
+    user_id = str(current_user.id)
 
     statement = select(Document).where(Document.user_id == user_id).order_by(Document.created_at.desc())
     documents = db.exec(statement).all()
@@ -124,21 +108,13 @@ def list_documents(
 def delete_document(
     document_id: int,
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Deletes a processed document from the platform.
     This also deletes local PDF file and associated database records (Document, DocumentChunk, Sessions, Turns).
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not found in system.")
+    user_id = str(current_user.id)
 
     doc = db.get(Document, document_id)
     if not doc:

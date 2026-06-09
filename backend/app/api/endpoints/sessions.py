@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from app.core.database import get_session
 from app.models.document import Document
 from app.models.session import PodcastSession, PodcastTurn
+from app.models.user import User
 from app.agents.podcast_graph import PodcastGraphService
 from app.agents.planner import PodcastPlanner
-from app.core.auth import get_user_id_by_email
+from app.core.auth import get_current_user
 
 router = APIRouter()
 
@@ -23,20 +24,12 @@ class NextTurnRequest(BaseModel):
 def create_session(
     data: SessionCreate,
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Creates a new podcast session if the document belongs to the user.
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not found in system.")
+    user_id = str(current_user.id)
 
     document = db.get(Document, data.document_id)
     if not document:
@@ -90,20 +83,12 @@ def create_session(
 def get_session_details(
     session_id: str,
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Retrieves the status and metadata of a podcast session if owned by the user.
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not found in system.")
+    user_id = str(current_user.id)
 
     session_obj = db.get(PodcastSession, session_id)
     if not session_obj:
@@ -130,20 +115,12 @@ def get_session_details(
 def get_session_turns(
     session_id: str,
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """
     Returns the full history of dialogue turns for a session if owned by the user.
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not found in system.")
+    user_id = str(current_user.id)
 
     session_obj = db.get(PodcastSession, session_id)
     if not session_obj:
@@ -177,20 +154,12 @@ def generate_next_turn(
     session_id: str,
     body: Optional[NextTurnRequest] = None,
     db: Session = Depends(get_session),
-    x_user_id: Optional[str] = Header(default=None),
-    x_user_email: Optional[str] = Header(default=None)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Triggers the generation of the next turn in the conversation if owned by the user.
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = x_user_id
-    if not user_id:
-        user_id = get_user_id_by_email(db, x_user_email)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not found in system.")
+    user_id = str(current_user.id)
 
     session_obj = db.get(PodcastSession, session_id)
     if not session_obj:

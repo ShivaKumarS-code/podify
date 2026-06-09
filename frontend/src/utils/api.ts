@@ -1,5 +1,3 @@
-import { authClient } from "@/lib/auth/client";
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export interface DocumentData {
@@ -41,18 +39,11 @@ export interface PodcastTurnData {
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
-    const session = await authClient.getSession();
-    console.log("getAuthHeaders session data:", session);
-    const email = session?.data?.user?.email;
-    const id = session?.data?.user?.id;
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
     const headers: Record<string, string> = {};
-    if (email) {
-      headers["X-User-Email"] = email;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
-    if (id) {
-      headers["X-User-Id"] = id;
-    }
-    console.log("getAuthHeaders headers:", headers);
     return headers;
   } catch (err) {
     console.error("Error retrieving session auth headers:", err);
